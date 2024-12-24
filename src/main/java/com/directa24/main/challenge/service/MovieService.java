@@ -4,38 +4,44 @@ import com.directa24.main.challenge.entity.Movie;
 import com.directa24.main.challenge.entity.MovieResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class MovieService {
 
-    private final RestTemplate restTemplate;
+    private final WebClient.Builder webClientBuilder;
+    private final ObjectMapper objectMapper;
 
     @Value("${eron.movies.service.url}")
     private String eronApiUrl;
 
-    public List<Movie> getMovies(int pageNumber){
+    public Mono<List<Movie>> getMovies(int pageNumber){
+
         UriComponentsBuilder uriComponentsBuilder = UriComponentsBuilder.fromHttpUrl(this.eronApiUrl + "/api/movies/search")
                 .queryParam("page", pageNumber);
-        byte[] responseBytes = restTemplate.getForObject(uriComponentsBuilder.toUriString(), byte [].class);
-
-        if (responseBytes != null) {
-            ObjectMapper objectMapper = new ObjectMapper();
-            try {
-                MovieResponse response = objectMapper.readValue(responseBytes, MovieResponse.class);
-                return response.getData();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        return new ArrayList<>();
+        return webClientBuilder
+                    .build()
+                    .get()
+                    .uri(uriComponentsBuilder.toUriString())
+                    .retrieve()
+                    .bodyToMono(byte[].class)
+                    .flatMap(monoResponse -> {
+                        try {
+                            MovieResponse movieResponse = objectMapper.readValue(monoResponse, MovieResponse.class);
+                            return Mono.just(movieResponse.getData());
+                        }catch(IOException e){
+                            return Mono.error(new RuntimeException("Error converting from byte [] to MovieResponse", e));
+                        }
+                    }).doOnError(error -> log.error("Error while trying to process API response:{}", error.getMessage()));
     }
 }

@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DirectorService {
 
-    private final MovieService movieService;
+    private final RestTemplateService movieService;
 
     public Map<String, Integer> countMoviesByDirector() {
         Map<String, Integer> dirCounts = new HashMap<>();
