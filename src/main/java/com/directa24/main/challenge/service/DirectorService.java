@@ -3,6 +3,8 @@ package com.directa24.main.challenge.service;
 import com.directa24.main.challenge.entity.Movie;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
 import java.util.List;
@@ -13,27 +15,27 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DirectorService {
 
-    private final RestTemplateService movieService;
+    private final MovieService movieService;
 
-    public Map<String, Integer> countMoviesByDirector() {
-        Map<String, Integer> dirCounts = new HashMap<>();
-        int pageNumber = 1;
-        List<Movie> movies;
-        do{
-            movies = movieService.getMovies(pageNumber++);
-            for(Movie movie : movies){
-                dirCounts.put(movie.getDirector(), dirCounts.getOrDefault(movie.getDirector(), 0) + 1);
-            }
-        }while(!movies.isEmpty());
-        return dirCounts;
+    public Mono<Map<String, Integer>> countMoviesByDirector() {
+        return Flux.range(1, Integer.MAX_VALUE)
+                .flatMap(this.movieService::getMovies)
+                .takeUntil(List::isEmpty)
+                .flatMap(Flux::fromIterable)
+                .collect(Collectors.groupingBy(Movie::getDirector, Collectors.counting()))
+                .map( map -> {
+                    Map<String, Integer> dirCounts = new HashMap<>();
+                    map.forEach((k, v) -> dirCounts.put(k, v.intValue()));
+                    return dirCounts;
+                });
     }
 
-    public List<String> getTopDirectors(int threshold) {
-        Map<String, Integer> dirCounts = countMoviesByDirector();
-        return dirCounts.entrySet().stream()
+    public Mono<List<String>> getTopDirectors(int threshold) {
+        return countMoviesByDirector()
+                .map( dirCount -> dirCount.entrySet().stream()
                 .filter(entry -> entry.getValue() > threshold)
                 .map(Map.Entry::getKey)
                 .sorted()
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
     }
 }

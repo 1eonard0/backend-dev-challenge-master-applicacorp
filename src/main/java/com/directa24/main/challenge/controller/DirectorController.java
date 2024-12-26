@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 
@@ -15,7 +16,7 @@ public class DirectorController {
     private final DirectorService directorService;
 
     @GetMapping("/top-directors")
-    public List<String> getTopDirectors(@RequestParam int threshold){
+    public Mono<List<String>> getTopDirectors(@RequestParam int threshold){
         return directorService.getTopDirectors(threshold);
     }
 

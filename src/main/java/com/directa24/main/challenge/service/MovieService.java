@@ -6,12 +6,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -42,6 +46,11 @@ public class MovieService {
                         }catch(IOException e){
                             return Mono.error(new RuntimeException("Error converting from byte [] to MovieResponse", e));
                         }
-                    }).doOnError(error -> log.error("Error while trying to process API response:{}", error.getMessage()));
+                    })
+                .retryWhen(Retry.backoff(3, Duration.ofSeconds(1))
+                        .maxBackoff(Duration.ofSeconds(10))
+                        .jitter(0.5)
+                        .filter(throwable -> throwable instanceof WebClientResponseException && ((WebClientResponseException) throwable).getStatusCode() == HttpStatus.TOO_MANY_REQUESTS))
+                .doOnError(error -> log.error("Error while trying to process API response:{}", error.getMessage()));
     }
 }
